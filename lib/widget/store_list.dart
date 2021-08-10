@@ -31,24 +31,11 @@ class StoreList extends StatelessWidget {
                       style: TextStyle(fontSize: 14, color: Colors.black),
                     ),
                     SizedBox(height: 5),
-                    FutureBuilder<String>(
-                      future: Common().getDistance(double.parse(storeName.lat),
-                          double.parse(storeName.lng)),
-                      builder: (BuildContext context,
-                          AsyncSnapshot<String> snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return Text("Computing distance ..",
-                              style:
-                                  TextStyle(fontSize: 12, color: Colors.black));
-                        } else {
-                          return Text(
-                              snapshot.data.toString() + " km away from you",
-                              style:
-                                  TextStyle(fontSize: 12, color: Colors.black));
-                        }
-                      },
-                    ),
+                    Text(
+                        Common().getDistance(double.parse(storeName.lat),
+                                double.parse(storeName.lng)) +
+                            " km away from you",
+                        style: TextStyle(fontSize: 12, color: Colors.black))
                   ])),
               SizedBox(width: 10),
               Icon(
@@ -58,9 +45,9 @@ class StoreList extends StatelessWidget {
               SizedBox(width: 10)
             ]),
             onPressed: () async {
-              String distance = await Common().getDistance(
+              String distance = Common().getDistance(
                   double.parse(storeName.lat), double.parse(storeName.lng));
-              Navigator.pushReplacement(
+              Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (context) => StoreDetails(

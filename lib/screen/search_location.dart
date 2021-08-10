@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -16,12 +17,10 @@ class SearchLocation extends StatefulWidget {
 
 class _SearchLocationState extends State<SearchLocation> {
   final TextEditingController _searchController = TextEditingController();
-  StoreResponse _storeResponse = null;
 
   @override
   void initState() {
     super.initState();
-    getLocationList();
   }
 
   @override
@@ -104,42 +103,47 @@ class _SearchLocationState extends State<SearchLocation> {
                 ],
               ),
             ),
-            _storeResponse == null
-                ? Expanded(
-                    child: Center(
+            FutureBuilder<StoreResponse>(
+              future: Common().getLocationList(),
+              builder: (BuildContext context,
+                  AsyncSnapshot<StoreResponse> snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Expanded(
+                      child: Center(
                     child: CircularProgressIndicator(),
-                  ))
-                : Expanded(
-                    child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        shrinkWrap: true,
-                        itemCount: _storeResponse.data.length,
-                        itemBuilder: (context, i) {
-                          StoreData storeData =
-                              _storeResponse.data.elementAt(i);
-                          if (storeData.businessName
-                              .toLowerCase()
-                              .contains(_searchController.text.toLowerCase())) {
-                            return StoreList(storeName: storeData);
-                          } else {
-                            return Container();
-                          }
-                        }))
+                  ));
+                } else {
+                  return Expanded(
+                      child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: snapshot.data.data.length,
+                          itemBuilder: (context, i) {
+                            LinkedHashMap sortedDistance =
+                                Common().sortDistance(Common.distance);
+                            StoreData storeData = snapshot.data.data
+                                .elementAt(sortedDistance.keys.elementAt(i));
+                            if (storeData.businessName.toLowerCase().contains(
+                                _searchController.text.toLowerCase())) {
+                              return StoreList(storeName: storeData);
+                            } else {
+                              return Container();
+                            }
+                          }));
+                }
+              },
+            ),
           ],
         ),
+        Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 10,
+              color: Colors.deepPurpleAccent,
+            )),
       ])),
     );
-  }
-
-  Future getLocationList() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String token = prefs.getString("accessKey");
-    String url = "https://stable-api.pricelocq.com/mobile/stations?all";
-    Map<String, String> header = {"Authorization": token};
-    Response response = await get(Uri.parse(url), headers: header);
-    Map responseMap = jsonDecode(response.body);
-    setState(() {
-      _storeResponse = StoreResponse.fromJson(responseMap);
-    });
   }
 }

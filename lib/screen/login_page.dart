@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:seaoil/model/login_request.dart';
 import 'package:http/http.dart';
 import 'package:seaoil/model/login_response.dart';
+import 'package:seaoil/widget/common.dart';
 import 'package:seaoil/widget/errorMessage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,10 +16,13 @@ class LoginState extends State<Login> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   TextEditingController mobileController = new TextEditingController();
   TextEditingController passwordController = new TextEditingController();
+  bool isLogin = false;
 
   @override
   void initState() {
     super.initState();
+    Common().getCurrentLocation();
+    Common().checkPermission();
     checkSession();
   }
 
@@ -73,23 +77,28 @@ class LoginState extends State<Login> {
                     )),
               ),
               SizedBox(height: 50),
-              Container(
-                  width: MediaQuery.of(context).size.width * 1,
-                  child: Material(
-                    borderRadius: BorderRadius.circular(25.0),
-                    color: Colors.deepPurpleAccent,
-                    child: MaterialButton(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25.0)),
-                      onPressed: () async {
-                        login();
-                      },
-                      child: Text("Login",
-                          textAlign: TextAlign.center,
-                          style:
-                              TextStyle(color: Colors.white, fontSize: 15.0)),
-                    ),
-                  ))
+              isLogin
+                  ? Center(child: CircularProgressIndicator())
+                  : Container(
+                      width: MediaQuery.of(context).size.width * 1,
+                      child: Material(
+                        borderRadius: BorderRadius.circular(25.0),
+                        color: Colors.deepPurpleAccent,
+                        child: MaterialButton(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25.0)),
+                          onPressed: () async {
+                            setState(() {
+                              isLogin = true;
+                            });
+                            login();
+                          },
+                          child: Text("Login",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 15.0)),
+                        ),
+                      ))
             ],
           ),
         ),
@@ -104,6 +113,9 @@ class LoginState extends State<Login> {
 
       if (mobile.isEmpty || password.isEmpty) {
         errorMessage("Mobile and password fields is required!");
+        setState(() {
+          isLogin = false;
+        });
         return;
       }
 
@@ -112,6 +124,9 @@ class LoginState extends State<Login> {
       String request = json.encode(loginRequest);
       String url = "https://stable-api.pricelocq.com/mobile/v2/sessions";
       Response response = await post(Uri.parse(url), body: request);
+      setState(() {
+        isLogin = false;
+      });
       if (response.statusCode == 200) {
         Map responseMap = jsonDecode(response.body);
         LoginResponse loginResponse = LoginResponse.fromJson(responseMap);

@@ -9,9 +9,7 @@ import 'package:seaoil/model/store_model.dart';
 import 'package:seaoil/model/store_response.dart';
 import 'package:seaoil/widget/common.dart';
 import 'package:seaoil/widget/errorMessage.dart';
-import 'package:permission_handler/permission_handler.dart' as perm;
 import 'package:seaoil/widget/nearby_list.dart';
-import 'package:seaoil/widget/store_list.dart';
 
 class Homepage extends StatefulWidget {
   @override
@@ -19,28 +17,26 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
+  CameraPosition currentPosition;
   GoogleMapController _controller;
 
-  double currentLocationlat = 14.7264;
-  double currentLocationlong = 120.9893;
   Set<Marker> _markers = {};
-  Map<int, int> distance = {};
   StoreResponse _storeResponse = null;
 
   @override
   void initState() {
     super.initState();
+    Common().checkPermission();
     getCurrentLocation();
-    checkPermission();
-    getTopNearbyStore();
+    getNearbyStore();
+    currentPosition = CameraPosition(
+      target: LatLng(Common.currentLat, Common.currentLong),
+      zoom: 14.4746,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    CameraPosition currentPosition = CameraPosition(
-      target: LatLng(currentLocationlat, currentLocationlong),
-      zoom: 14.4746,
-    );
     return Scaffold(
       body: Container(
           child: Stack(children: [
@@ -91,21 +87,15 @@ class _HomepageState extends State<Homepage> {
                 mapType: MapType.normal,
                 initialCameraPosition: currentPosition,
                 onMapCreated: (GoogleMapController controller) {
-                  _controller = controller;
-                  setState(() {
-                    if (currentLocationlat != null) {
-                      _markers.add(Marker(
-                        markerId: MarkerId("Your Location"),
-                        position:
-                            LatLng(currentLocationlat, currentLocationlong),
-                      ));
-                      _controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(
-                            LatLng(currentLocationlat, currentLocationlong),
-                            14.4746),
-                      );
-                    }
-                  });
+                  _controller = (controller);
+                  _markers.add(Marker(
+                    markerId: MarkerId("Your Location"),
+                    position: LatLng(Common.currentLat, Common.currentLong),
+                  ));
+                  _controller.animateCamera(
+                    CameraUpdate.newLatLngZoom(
+                        LatLng(Common.currentLat, Common.currentLong), 14.4746),
+                  );
                 },
               ),
             ),
@@ -140,30 +130,35 @@ class _HomepageState extends State<Homepage> {
                         ))
                   ],
                 ),
-                distance.length == 0
+                Common.distance.length == 0
                     ? Expanded(
-                        child: Center(child: CircularProgressIndicator()))
+                        child: Center(
+                            child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 20),
+                          Text("Getting nearby station..")
+                        ],
+                      )))
                     : Expanded(
                         child: ListView.builder(
                             padding: EdgeInsets.zero,
                             shrinkWrap: true,
-                            itemCount:
-                                distance.length > 5 ? 5 : distance.length,
+                            itemCount: Common.distance.length > 5
+                                ? 5
+                                : Common.distance.length,
                             itemBuilder: (context, i) {
-                              var sortedKeys = distance.keys
-                                  .toList(growable: false)
-                                    ..sort((k1, k2) =>
-                                        distance[k1].compareTo(distance[k2]));
-                              LinkedHashMap sortedMap =
-                                  new LinkedHashMap.fromIterable(sortedKeys,
-                                      key: (k) => k, value: (k) => distance[k]);
+                              LinkedHashMap sortedDistance =
+                                  Common().sortDistance(Common.distance);
                               StoreData storeData = _storeResponse.data
-                                  .elementAt(sortedMap.keys.elementAt(i));
-                              print(sortedMap);
+                                  .elementAt(sortedDistance.keys.elementAt(i));
                               return NearbyList(
                                   storeName: storeData,
-                                  distance:
-                                      sortedMap.values.elementAt(i).toString());
+                                  distance: sortedDistance.values
+                                      .elementAt(i)
+                                      .toString());
                             }),
                       ),
               ],
@@ -182,45 +177,38 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  checkPermission() async {
-    Location location = new Location();
-    bool _serviceEnabled;
-
-    if (await perm.Permission.location.request().isGranted) {
-      if (await perm.Permission.locationWhenInUse.serviceStatus.isEnabled) {
-      } else {
-        _serviceEnabled = await location.serviceEnabled();
-        if (!_serviceEnabled) {
-          await location.requestService().then((value) => value);
-        } else {
-          errorMessage("Please turn on location to use this feature!");
-        }
-      }
-    } else {
-      errorMessage("Please enable location permission!");
-    }
-  }
-
   Future<void> getCurrentLocation() async {
     LocationData _locationData = await Common().getCurrentLocation();
     if (_locationData != null) {
       setState(() {
-        currentLocationlat = _locationData.latitude;
-        currentLocationlong = _locationData.longitude;
+        try {
+          _markers.add(Marker(
+            markerId: MarkerId("Your Location"),
+            position: LatLng(Common.currentLat, Common.currentLong),
+          ));
+          _controller.animateCamera(
+            CameraUpdate.newLatLngZoom(
+                LatLng(Common.currentLat, Common.currentLong), 14.4746),
+          );
+        } catch (Exception) {}
       });
+    } else {
+      errorMessage("Failed to get your location");
     }
   }
 
-  Future<Map<int, int>> getTopNearbyStore() async {
+  Future<Map<int, int>> getNearbyStore() async {
     try {
       _storeResponse = await Common().getLocationList();
       for (int i = 0; i < _storeResponse.data.length; i++) {
-        String d = await Common().getDistance(
+        print(
+            Common.currentLat.toString() + " " + Common.currentLong.toString());
+        String d = Common().getDistance(
             double.parse(_storeResponse.data.elementAt(i).lat),
             double.parse(_storeResponse.data.elementAt(i).lng));
-        distance[i] = int.parse(d);
-        setState(() {});
+        Common.distance[i] = int.parse(d);
       }
+      setState(() {});
     } catch (Exception) {}
   }
 }
